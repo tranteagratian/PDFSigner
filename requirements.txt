@@ -1,0 +1,4 @@
+PyQt6>=6.6.0
+python-pkcs11>=0.9.0
+pyhanko>=0.25.0
+asn1crypto>=1.5.0
