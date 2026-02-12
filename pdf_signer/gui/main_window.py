@@ -164,12 +164,19 @@ class MainWindow(QMainWindow):
     # ── Auto-detect ──────────────────────────────────────────────
 
     def _auto_detect(self):
-        path = self.token_manager.auto_detect_library()
+        self.lib_path_edit.setPlaceholderText("Searching for PKCS#11 library...")
+        try:
+            path = self.token_manager.auto_detect_library()
+        except Exception as e:
+            path = None
         if path:
             self.lib_path_edit.setText(path)
             self._refresh_tokens()
         else:
-            self.status_label.setText("No PKCS#11 library found - use Browse")
+            self.lib_path_edit.setPlaceholderText("")
+            self.lib_path_edit.setText("")
+            self._set_status_color("orange")
+            self.status_label.setText("No PKCS#11 library found - click Browse to select .dylib")
 
     def _browse_library(self):
         path, _ = QFileDialog.getOpenFileName(

@@ -5,22 +5,35 @@ import pkcs11
 from pkcs11 import Attribute, ObjectClass
 
 
-def _bundled_lib_path() -> str:
-    """Return the path to the PKCS#11 library bundled with the app."""
+def _get_bundled_lib_paths() -> list[str]:
+    """Return possible paths to the PKCS#11 library bundled with the app."""
+    paths = []
     if getattr(sys, "frozen", False):
-        # Running as PyInstaller bundle
+        # Running as PyInstaller bundle - try multiple possible locations
         base = sys._MEIPASS
+        paths.append(os.path.join(base, "pdf_signer", "drivers", "libcryptoide_pkcs11.dylib"))
+        paths.append(os.path.join(base, "drivers", "libcryptoide_pkcs11.dylib"))
+        paths.append(os.path.join(base, "libcryptoide_pkcs11.dylib"))
+        # Also check next to the executable
+        exe_dir = os.path.dirname(sys.executable)
+        paths.append(os.path.join(exe_dir, "pdf_signer", "drivers", "libcryptoide_pkcs11.dylib"))
+        paths.append(os.path.join(exe_dir, "drivers", "libcryptoide_pkcs11.dylib"))
+        paths.append(os.path.join(exe_dir, "libcryptoide_pkcs11.dylib"))
+        # macOS .app bundle: check inside Resources
+        resources_dir = os.path.join(exe_dir, "..", "Resources")
+        paths.append(os.path.join(resources_dir, "pdf_signer", "drivers", "libcryptoide_pkcs11.dylib"))
+        paths.append(os.path.join(resources_dir, "drivers", "libcryptoide_pkcs11.dylib"))
     else:
-        # Running from source - go up from core/ to pdf_signer/ to project root
+        # Running from source
         base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    return os.path.join(base, "pdf_signer", "drivers", "libcryptoide_pkcs11.dylib")
+        paths.append(os.path.join(base, "pdf_signer", "drivers", "libcryptoide_pkcs11.dylib"))
+    return paths
 
 
 class TokenManager:
     """Manages PKCS#11 library loading, token detection, and certificate enumeration."""
 
-    KNOWN_LIB_PATHS = [
-        _bundled_lib_path(),  # Bundled with the app (works out of the box)
+    SYSTEM_LIB_PATHS = [
         "/Applications/CryptoUserTools.app/Contents/lib/mac/libcryptoide_pkcs11.dylib",
         "/opt/CryptoIDE/lib/libcryptoide_pkcs11.dylib",
         "/usr/local/lib/libeTPkcs11.dylib",
@@ -46,8 +59,8 @@ class TokenManager:
         self._lib_path = path
 
     def auto_detect_library(self) -> str | None:
-        import os
-        for path in self.KNOWN_LIB_PATHS:
+        all_paths = _get_bundled_lib_paths() + self.SYSTEM_LIB_PATHS
+        for path in all_paths:
             if os.path.exists(path):
                 try:
                     self.load_library(path)
